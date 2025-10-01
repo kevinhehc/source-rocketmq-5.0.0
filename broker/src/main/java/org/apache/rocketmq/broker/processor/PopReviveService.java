@@ -56,6 +56,7 @@ public class PopReviveService extends ServiceThread {
     private String reviveTopic;
     private volatile boolean shouldRunPopRevive = false;
 
+
     public PopReviveService(BrokerController brokerController, String reviveTopic, int queueId) {
         this.queueId = queueId;
         this.brokerController = brokerController;

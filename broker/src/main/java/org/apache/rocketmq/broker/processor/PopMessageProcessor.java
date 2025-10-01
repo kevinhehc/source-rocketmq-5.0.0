@@ -364,6 +364,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
                 }
             }
         }
+        // 如果不指定queueId，随机选择一个
         if (requestHeader.getQueueId() < 0) {
             // read all queue
             for (int i = 0; i < topicConfig.getReadQueueNums(); i++) {
@@ -489,6 +490,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
                     this.brokerController.getMessageStore().getMaxOffsetInQueue(topic, queueId) - offset + restNum;
                 return restNum;
             }
+
             getMessageTmpResult = this.brokerController.getMessageStore().getMessage(requestHeader.getConsumerGroup()
                     , topic, queueId, offset,
                     requestHeader.getMaxMsgNums() - getMessageResult.getMessageMapedList().size(), messageFilter);
@@ -559,13 +561,21 @@ public class PopMessageProcessor implements NettyRequestProcessor {
 
     private long getPopOffset(String topic, PopMessageRequestHeader requestHeader, int queueId, boolean init,
         String lockKey) {
+        // 先查消费组在该队列的已提交位点。
+        // 若 offset >= 0：说明有历史进度，直接以此为基准（先别返回，后面还要和 PopBuffer 对齐）。
         long offset = this.brokerController.getConsumerOffsetManager().queryOffset(requestHeader.getConsumerGroup(),
             topic, queueId);
+
         if (offset < 0) {
+            // 没有历史位点
+
             if (ConsumeInitMode.MIN == requestHeader.getInitMode()) {
+                // MIN：从最早可读开始（适合要补全历史的场景）。
                 offset = this.brokerController.getMessageStore().getMinOffsetInQueue(topic, queueId);
             } else {
+                // 非 MIN（默认理解为“最新”）：从队尾开始，只消费后续新写入的消息（常见于上线新消费者时不追历史）。
                 // pop last one,then commit offset.
+                // 由于 getMaxOffsetInQueue() 返回的是“下一条将写入的位置”，所以“最新一条”的偏移是 max - 1。
                 offset = this.brokerController.getMessageStore().getMaxOffsetInQueue(topic, queueId) - 1;
                 // max & no consumer offset
                 if (offset < 0) {
@@ -578,10 +588,16 @@ public class PopMessageProcessor implements NettyRequestProcessor {
                 }
             }
         }
+        // 再从 PopBufferMergeService 拿一个“更保守的起点”：
+        //	•	PopBuffer 里会短暂维护 POP 过程中与 CK/ACK 关联的状态；
+        //	•	对于“已经被 POP 出去、还处在不可见期/待 ACK 状态”的消息，其 offset 可能尚未体现在 ConsumerOffset；
+        //	•	为了避免把这些尚不可见/待确认的消息又读出来，需要把起点提升到 PopBuffer 记录的“latestOffset”。
         long bufferOffset = this.popBufferMergeService.getLatestOffset(lockKey);
         if (bufferOffset < 0) {
+            // 如果 PopBuffer 没有记录（< 0），就用上一步推导/查询的 offset；
             return offset;
         } else {
+            // 否则取 max(bufferOffset, offset)：谁大用谁，保证不倒退、不重复。
             return bufferOffset > offset ? bufferOffset : offset;
         }
     }

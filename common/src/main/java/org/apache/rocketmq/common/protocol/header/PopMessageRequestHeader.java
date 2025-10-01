@@ -122,6 +122,12 @@ public class PopMessageRequestHeader implements CommandCustomHeader {
         this.maxMsgNums = maxMsgNums;
     }
 
+    // 	•	bornTime：请求创建的时间戳（毫秒）。
+    //	•	pollTime：允许长轮询的等待时间（客户端传过来的，或者 Broker 设置的）。
+    //	•	System.currentTimeMillis()：当前时间。
+    // 在 长轮询 POP 拉取消息时，请求可能会挂起等待新消息。Broker 会用这个方法判断：
+    //	•	如果请求已经等待的时间远超它的预期（pollTime）+ 500ms 容忍区间 → 就算还没拉到新消息，也要返回，避免请求一直挂着。
+    //	•	这样可以防止因为调度延迟、网络抖动，导致请求永远卡死，保证客户端最终能拿到一个响应。
     public boolean isTimeoutTooMuch() {
         return System.currentTimeMillis() - bornTime - pollTime > 500;
     }

@@ -267,6 +267,7 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
 
     /**
      * Maximum amount of invisible time in millisecond of a message, rang is [5000, 300000]
+     * 5秒到6分钟，默认1分钟
      */
     private long popInvisibleTime = 60000;
 
