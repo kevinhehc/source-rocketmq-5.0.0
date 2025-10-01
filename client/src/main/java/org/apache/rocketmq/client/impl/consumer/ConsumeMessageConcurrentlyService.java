@@ -214,6 +214,7 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
                     }
                 }
 
+                // 消费消息
                 ConsumeRequest consumeRequest = new ConsumeRequest(msgThis, processQueue, messageQueue);
                 try {
                     this.consumeExecutor.submit(consumeRequest);
@@ -302,6 +303,7 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
                 break;
         }
 
+        // 消息处理完，删除消息
         long offset = consumeRequest.getProcessQueue().removeMessage(consumeRequest.getMsgs());
         if (offset >= 0 && !consumeRequest.getProcessQueue().isDropped()) {
             this.defaultMQPushConsumerImpl.getOffsetStore().updateOffset(consumeRequest.getMessageQueue(), offset, true);
