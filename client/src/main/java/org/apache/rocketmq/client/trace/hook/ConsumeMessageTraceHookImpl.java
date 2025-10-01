@@ -45,6 +45,7 @@ public class ConsumeMessageTraceHookImpl implements ConsumeMessageHook {
         return "ConsumeMessageTraceHook";
     }
 
+    // 消费前做记录
     @Override
     public void consumeMessageBefore(ConsumeMessageContext context) {
         if (context == null || context.getMsgList() == null || context.getMsgList().isEmpty()) {
@@ -84,6 +85,7 @@ public class ConsumeMessageTraceHookImpl implements ConsumeMessageHook {
         }
     }
 
+    // 消费后做记录
     @Override
     public void consumeMessageAfter(ConsumeMessageContext context) {
         if (context == null || context.getMsgList() == null || context.getMsgList().isEmpty()) {

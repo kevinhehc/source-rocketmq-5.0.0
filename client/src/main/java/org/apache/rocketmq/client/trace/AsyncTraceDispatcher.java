@@ -53,31 +53,79 @@ import static org.apache.rocketmq.client.trace.TraceConstants.TRACE_INSTANCE_NAM
 
 public class AsyncTraceDispatcher implements TraceDispatcher {
 
+    // 日志记录器，用于记录运行时的调试、错误等日志
     private final static InternalLogger log = ClientLogger.getLog();
+
+    // 原子整型计数器，通常用于生成全局唯一的序号或统计次数
     private final static AtomicInteger COUNTER = new AtomicInteger();
+
+    // 队列的最大容量，表示可缓存的 TraceContext 数量
     private final int queueSize;
+
+    // 每次批量处理的大小，决定一次最多发送多少 trace 数据
     private final int batchSize;
+
+    // 单条消息的最大大小限制，避免消息体过大
     private final int maxMsgSize;
+
+    // 轮询时间（毫秒），用于线程循环时的等待间隔
     private final long pollingTimeMil;
+
+    // 等待超时时间阈值（毫秒），超过该时间未能处理的任务可能会被丢弃
     private final long waitTimeThresholdMil;
+
+    // 用于发送 trace 数据的 RocketMQ 生产者
     private final DefaultMQProducer traceProducer;
+
+    // 执行 trace 任务的线程池，用来异步处理 trace 数据
     private final ThreadPoolExecutor traceExecutor;
-    // The last discard number of log
+
+    // 丢弃日志的次数（原子计数），用于统计被丢弃的 trace 条目数
     private AtomicLong discardCount;
+
+    // 后台执行任务的工作线程
     private Thread worker;
+
+    // 存放 TraceContext 的阻塞队列，用于存储待处理的 trace 数据
     private final ArrayBlockingQueue<TraceContext> traceContextQueue;
+
+    // 按 Topic 组织的任务队列，保存每个 Topic 对应的 trace 数据分片
     private final HashMap<String, TraceDataSegment> taskQueueByTopic;
+
+    // 任务追加的阻塞队列，通常配合线程池使用
     private ArrayBlockingQueue<Runnable> appenderQueue;
+
+    // JVM 关闭时的钩子线程，用于资源清理
     private volatile Thread shutDownHook;
+
+    // 停止标识位，控制是否结束工作线程
     private volatile boolean stopped = false;
+
+    // 宿主生产者实例（宿主业务 Producer）
     private DefaultMQProducerImpl hostProducer;
+
+    // 宿主消费者实例（宿主业务 Consumer）
     private DefaultMQPushConsumerImpl hostConsumer;
+
+    // 选择发送到哪个队列的索引工具，保证消息均衡分布
     private volatile ThreadLocalIndex sendWhichQueue = new ThreadLocalIndex();
+
+    // dispatcher 的唯一标识符，用于区分不同的 trace 任务实例
     private String dispatcherId = UUID.randomUUID().toString();
+
+    // trace 消息发送的目标 Topic 名称
     private volatile String traceTopicName;
+
+    // 是否已启动的标识位，防止重复初始化
     private AtomicBoolean isStarted = new AtomicBoolean(false);
+
+    // 访问通道类型（LOCAL、CLOUD 等），决定消息投递路径
     private volatile AccessChannel accessChannel = AccessChannel.LOCAL;
+
+    // 消费组名，用于标识 trace 任务所属的 Group
     private String group;
+
+    // 类型（生产者 / 消费者），用于区分 trace 的来源
     private Type type;
 
     public AsyncTraceDispatcher(String group, Type type, String traceTopicName, RPCHook rpcHook) {
