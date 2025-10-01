@@ -105,7 +105,11 @@ public class ProcessQueue {
             }
 
             try {
+                // "1s 5s 10s 30s 1m 2m 3m 4m 5m 6m 7m 8m 9m 10m 20m 30m 1h 2h";
 
+                // 清除消费超时的数据
+
+                // 这次延迟消费 10s。下次消费失败，会再通过【delayLevel = 3 + msgExt.getReconsumeTimes();】来计算
                 pushConsumer.sendMessageBack(msg, 3);
                 log.info("send expire msg back. topic={}, msgId={}, storeHost={}, queueId={}, queueOffset={}", msg.getTopic(), msg.getMsgId(), msg.getStoreHost(), msg.getQueueId(), msg.getQueueOffset());
                 try {

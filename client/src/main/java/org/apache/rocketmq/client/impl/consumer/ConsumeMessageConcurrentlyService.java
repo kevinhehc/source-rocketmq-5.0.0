@@ -93,6 +93,7 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
             @Override
             public void run() {
                 try {
+                    // 定时清除消费超时的消息
                     cleanExpireMsg();
                 } catch (Throwable e) {
                     log.error("scheduleAtFixedRate cleanExpireMsg exception", e);

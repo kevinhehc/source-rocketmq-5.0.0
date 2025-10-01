@@ -262,6 +262,7 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
     /**
      * Maximum amount of time in minutes a message may block the consuming thread.
      */
+    // 消费超时的处理
     private long consumeTimeout = 15;
 
     /**

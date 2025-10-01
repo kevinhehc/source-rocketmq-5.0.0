@@ -75,6 +75,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
         SendMessageContext traceContext;
         switch (request.getCode()) {
             case RequestCode.CONSUMER_SEND_MSG_BACK:
+
                 return this.consumerSendMsgBack(ctx, request);
             default:
                 SendMessageRequestHeader requestHeader = parseRequestHeader(request);

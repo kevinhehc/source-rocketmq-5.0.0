@@ -200,10 +200,12 @@ public abstract class AbstractSendMessageProcessor implements NettyRequestProces
             }
             msgExt.setDelayTimeLevel(0);
         } else {
+            // 延迟级别
             if (0 == delayLevel) {
                 delayLevel = 3 + msgExt.getReconsumeTimes();
             }
 
+            // 延迟级别
             msgExt.setDelayTimeLevel(delayLevel);
         }
 

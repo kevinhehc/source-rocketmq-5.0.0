@@ -1463,6 +1463,7 @@ public class MQClientAPIImpl implements NameServerUpdateCallback {
         requestHeader.setGroup(consumerGroup);
         requestHeader.setOriginTopic(msg.getTopic());
         requestHeader.setOffset(msg.getCommitLogOffset());
+        // 延迟消费
         requestHeader.setDelayLevel(delayLevel);
         requestHeader.setOriginMsgId(msg.getMsgId());
         requestHeader.setMaxReconsumeTimes(maxConsumeRetryTimes);
