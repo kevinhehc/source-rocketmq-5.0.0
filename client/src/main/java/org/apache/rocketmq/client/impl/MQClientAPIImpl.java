@@ -829,6 +829,7 @@ public class MQClientAPIImpl implements NameServerUpdateCallback {
         if (PullSysFlag.hasLitePullFlag(requestHeader.getSysFlag())) {
             request = RemotingCommand.createRequestCommand(RequestCode.LITE_PULL_MESSAGE, requestHeader);
         } else {
+            //
             request = RemotingCommand.createRequestCommand(RequestCode.PULL_MESSAGE, requestHeader);
         }
 
