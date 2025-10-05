@@ -209,6 +209,7 @@ public class HookUtils {
         return null;
     }
 
+    // 对延迟消息，转换为的延迟topic，延迟等级转换到对应的queueId
     public static void transformDelayLevelMessage(BrokerController brokerController, MessageExtBrokerInner msg) {
 
         if (msg.getDelayTimeLevel() > brokerController.getScheduleMessageService().getMaxDelayLevel()) {
