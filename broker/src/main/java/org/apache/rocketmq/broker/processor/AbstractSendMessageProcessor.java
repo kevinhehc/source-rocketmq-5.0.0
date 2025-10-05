@@ -122,6 +122,7 @@ public abstract class AbstractSendMessageProcessor implements NettyRequestProces
             return response;
         }
 
+        // 重试的消息的topic = "%RETRY%" + consumeGroup;
         String newTopic = MixAll.getRetryTopic(requestHeader.getGroup());
         int queueIdInt = this.random.nextInt(subscriptionGroupConfig.getRetryQueueNums());
 
@@ -210,6 +211,7 @@ public abstract class AbstractSendMessageProcessor implements NettyRequestProces
         }
 
         MessageExtBrokerInner msgInner = new MessageExtBrokerInner();
+        // 设置消费的topic
         msgInner.setTopic(newTopic);
         msgInner.setBody(msgExt.getBody());
         msgInner.setFlag(msgExt.getFlag());

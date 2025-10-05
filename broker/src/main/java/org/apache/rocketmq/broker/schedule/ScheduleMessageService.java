@@ -339,6 +339,7 @@ public class ScheduleMessageService extends ConfigManager {
         return true;
     }
 
+    // 消息到了超时时间
     private MessageExtBrokerInner messageTimeup(MessageExt msgExt) {
         MessageExtBrokerInner msgInner = new MessageExtBrokerInner();
         msgInner.setBody(msgExt.getBody());
@@ -362,6 +363,7 @@ public class ScheduleMessageService extends ConfigManager {
         MessageAccessor.clearProperty(msgInner, MessageConst.PROPERTY_TIMER_DELIVER_MS);
         MessageAccessor.clearProperty(msgInner, MessageConst.PROPERTY_TIMER_DELAY_SEC);
 
+        // 还原回来真正的topic
         msgInner.setTopic(msgInner.getProperty(MessageConst.PROPERTY_REAL_TOPIC));
 
         String queueIdStr = msgInner.getProperty(MessageConst.PROPERTY_REAL_QUEUE_ID);
@@ -476,6 +478,7 @@ public class ScheduleMessageService extends ConfigManager {
                         return;
                     }
 
+                    // 一样会造成冷读
                     MessageExt msgExt = ScheduleMessageService.this.brokerController.getMessageStore().lookMessageByOffset(offsetPy, sizePy);
                     if (msgExt == null) {
                         continue;
@@ -786,6 +789,7 @@ public class ScheduleMessageService extends ConfigManager {
                 }
 
                 MessageExtBrokerInner msgInner = ScheduleMessageService.this.messageTimeup(msgExt);
+                // 多写了一份数据到store
                 PutMessageResult result = ScheduleMessageService.this.brokerController.getEscapeBridge().putMessage(msgInner);
                 this.handleResult(result);
                 if (result != null && result.getPutMessageStatus() == PutMessageStatus.PUT_OK) {
