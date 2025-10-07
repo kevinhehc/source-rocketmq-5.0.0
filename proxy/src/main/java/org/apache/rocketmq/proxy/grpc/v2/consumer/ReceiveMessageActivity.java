@@ -47,6 +47,24 @@ import org.apache.rocketmq.proxy.service.route.AddressableMessageQueue;
 import org.apache.rocketmq.proxy.service.route.MessageQueueSelector;
 import org.apache.rocketmq.proxy.service.route.MessageQueueView;
 
+// ┌──────────────────────────────────┐
+// │         ReceiveMessageActivity   │
+// └──────────────┬───────────────────┘
+//                │
+//         [1] 构建拉取请求
+//                │
+//         [2] 发送至 Broker
+//                │
+//         [3] 收到响应（消息体 + ReceiptHandle）
+//                │
+//         [4] 缓存 handle → ReceiptHandleProcessor
+//                │
+//         [5] 包装成 MessageView
+//                │
+//         [6] 调用 MessageListener 消费
+//                │
+//         [7] 定时续期 / ack / 删除 handle
+
 public class ReceiveMessageActivity extends AbstractMessingActivity {
     protected ReceiptHandleProcessor receiptHandleProcessor;
 
@@ -124,11 +142,13 @@ public class ReceiveMessageActivity extends AbstractMessingActivity {
                                 MessageReceiptHandle messageReceiptHandle =
                                     new MessageReceiptHandle(group, topic, messageExt.getQueueId(), receiptHandle, messageExt.getMsgId(),
                                         messageExt.getQueueOffset(), messageExt.getReconsumeTimes());
+                                // 添加消息的 MessageReceiptHandle
                                 receiptHandleProcessor.addReceiptHandle(ctx.getClientID(), group, messageExt.getMsgId(), receiptHandle, messageReceiptHandle);
                             }
                         }
                     }
                 }
+                // 发送给消费者
                 writer.writeAndComplete(ctx, request, popResult);
             })
                 .exceptionally(t -> {

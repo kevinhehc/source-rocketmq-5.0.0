@@ -139,7 +139,21 @@ public class ProxyConfig implements ConfigFile {
 
     private long longPollingReserveTimeInMillis = 100;
 
+    // Broker 状态一致性保护
+    //
+    //如果 Proxy 在清理过程中，消息的 changeInvisibleTime(0) 请求与其他请求（如 ack、renew）并发到达 Broker，
+    //会导致 Broker 端的可见性状态出现竞态（race condition）：
+    //	•	情况A：消费者刚发出 ack 请求；
+    //	•	情况B：Proxy 也在清理时发出 changeInvisibleTime(0)。
+    //
+    //这两者的先后顺序在网络层不可控，如果立刻设为可见：
+    //	•	Broker 可能把消息错误地重新投递；
+    //	•	或者误删正在确认中的消息。
+    //
+    //设置 1 秒延迟 相当于一个“保护缓冲区”，
+    //允许潜在的 ACK 请求在这 1 秒内到达 Broker，从而保证状态一致。
     private long invisibleTimeMillisWhenClear = 1000L;
+
     private boolean enableProxyAutoRenew = true;
     private int maxRenewRetryTimes = 3;
     private int renewThreadPoolNums = 2;
