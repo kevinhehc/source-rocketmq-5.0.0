@@ -814,24 +814,56 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
         }
     }
 
+    /**
+     * 异步修改消息的不可见时间（InvisibleTime）。
+     *
+     * 在 RocketMQ 的 POP 消费模式中，消费者从 Broker 拉取消息后，这些消息在一段时间内会被标记为“不可见”。
+     * 若消费者在该时间内未确认（ACK）消息，消息会重新变为可见，从而允许其他消费者重新拉取。
+     *
+     * 本方法用于在消费过程中“续期”这段不可见时间（例如消费者正在处理消息，还没消费完），
+     * 以防止消息过早变为可见。
+     *
+     * @param topic 消息主题
+     * @param consumerGroup 消费组名称
+     * @param extraInfo 消息附加信息（包含 brokerName、queueId、offset 等）
+     * @param invisibleTime 新的不可见时间（单位：毫秒）
+     * @param callback 异步回调，用于接收 Broker 返回结果
+     *
+     * @throws MQClientException    客户端异常（如路由找不到等）
+     * @throws RemotingException    网络或远程调用异常
+     * @throws InterruptedException 线程中断异常
+     * @throws MQBrokerException    Broker 返回的业务异常
+     */
     void changePopInvisibleTimeAsync(String topic, String consumerGroup, String extraInfo, long invisibleTime, AckCallback callback)
         throws MQClientException, RemotingException, InterruptedException, MQBrokerException {
+        // 从 extraInfo 中解析出 brokerName、queueId、offset 等基本信息。
         String[] extraInfoStrs = ExtraInfoUtil.split(extraInfo);
         String brokerName = ExtraInfoUtil.getBrokerName(extraInfoStrs);
         int queueId = ExtraInfoUtil.getQueueId(extraInfoStrs);
 
+
+        //    处理逻辑队列场景（Logical Queue）
+        //    如果 brokerName 是逻辑队列标识（如 "LOGICAL_QUEUE_MOCK_BROKER_XXX"），
+        //    则需从 MQClientFactory 中解析出实际物理 broker 名称。
         String desBrokerName = brokerName;
         if (brokerName != null && brokerName.startsWith(MixAll.LOGICAL_QUEUE_MOCK_BROKER_PREFIX)) {
             desBrokerName = this.mQClientFactory.getBrokerNameFromMessageQueue(this.defaultMQPushConsumer.queueWithNamespace(new MessageQueue(topic, brokerName, queueId)));
         }
 
+
+        //    查找 Broker 地址。
+        //    从客户端的路由缓存中查找目标 broker 的 master 节点地址。
         FindBrokerResult
             findBrokerResult = this.mQClientFactory.findBrokerAddressInSubscribe(desBrokerName, MixAll.MASTER_ID, true);
+
+        //   如果找不到 Broker 地址，则主动刷新路由信息，再尝试查找一次。
         if (null == findBrokerResult) {
             this.mQClientFactory.updateTopicRouteInfoFromNameServer(topic);
             findBrokerResult = this.mQClientFactory.findBrokerAddressInSubscribe(desBrokerName, MixAll.MASTER_ID, true);
         }
+        // 如果找到了目标 Broker，则构造请求头并发起异步请求。
         if (findBrokerResult != null) {
+            // 构建 ChangeInvisibleTime 请求头，封装消息定位信息与新的不可见时间。
             ChangeInvisibleTimeRequestHeader requestHeader = new ChangeInvisibleTimeRequestHeader();
             requestHeader.setTopic(ExtraInfoUtil.getRealTopic(extraInfoStrs, topic, consumerGroup));
             requestHeader.setQueueId(queueId);
@@ -840,9 +872,15 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
             requestHeader.setExtraInfo(extraInfo);
             requestHeader.setInvisibleTime(invisibleTime);
             //here the broker should be polished
+            //     通过 MQClientAPIImpl 发起异步请求，通知 Broker 修改该消息的不可见时间。
+            //     - brokerName：消息原始所在 broker
+            //     - findBrokerResult.getBrokerAddr()：broker 地址
+            //     - ASYNC_TIMEOUT：请求超时时间
+            //     - callback：异步回调函数
             this.mQClientFactory.getMQClientAPIImpl().changeInvisibleTimeAsync(brokerName, findBrokerResult.getBrokerAddr(), requestHeader, ASYNC_TIMEOUT, callback);
             return;
         }
+        // 若最终仍未找到 broker，则抛出异常。
         throw new MQClientException("The broker[" + desBrokerName + "] not exist", null);
     }
 

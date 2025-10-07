@@ -211,30 +211,51 @@ public class ConsumeMessagePopConcurrentlyService implements ConsumeMessageServi
         }
     }
 
+    /**
+     * 处理消息消费结果的核心方法。
+     *
+     * 该方法在 POP 消费模式下被调用，用于根据消费结果（成功或失败）：
+     *  1. 统计消费指标；
+     *  2. 对成功消费的消息执行 ACK（确认）；
+     *  3. 对失败的消息执行“重新投递”或“延迟重试”（通过修改 invisibleTime 实现）。
+     *
+     * @param status  消费结果（CONSUME_SUCCESS 或 RECONSUME_LATER）
+     * @param context 消费上下文（包含 ackIndex、延迟级别等信息）
+     * @param consumeRequest 消费请求，包含消息列表与队列信息
+     */
     public void processConsumeResult(
         final ConsumeConcurrentlyStatus status,
         final ConsumeConcurrentlyContext context,
         final ConsumeRequest consumeRequest) {
 
+        // 如果当前请求中没有消息，则直接返回
         if (consumeRequest.getMsgs().isEmpty()) {
             return;
         }
 
+        // 获取用户指定的确认（ACK）下标
         int ackIndex = context.getAckIndex();
         String topic = consumeRequest.getMessageQueue().getTopic();
 
+        // 根据消费结果类型进行不同处理
         switch (status) {
             case CONSUME_SUCCESS:
+                // 若 ackIndex 超出消息数量范围，则修正为最后一条
                 if (ackIndex >= consumeRequest.getMsgs().size()) {
                     ackIndex = consumeRequest.getMsgs().size() - 1;
                 }
+                // 成功消费的数量 = ackIndex + 1
                 int ok = ackIndex + 1;
+                // 失败的数量 = 总消息数 - 成功数
                 int failed = consumeRequest.getMsgs().size() - ok;
+                // 更新消费统计指标：成功数与失败数的 TPS（每秒事务数）
                 this.getConsumerStatsManager().incConsumeOKTPS(consumerGroup, topic, ok);
                 this.getConsumerStatsManager().incConsumeFailedTPS(consumerGroup, topic, failed);
                 break;
             case RECONSUME_LATER:
+                // 消费失败：ackIndex = -1 表示全部未确认
                 ackIndex = -1;
+                // 统计全部消息为失败
                 this.getConsumerStatsManager().incConsumeFailedTPS(consumerGroup, topic,
                         consumeRequest.getMsgs().size());
                 break;
@@ -242,6 +263,8 @@ public class ConsumeMessagePopConcurrentlyService implements ConsumeMessageServi
                 break;
         }
 
+        //    对成功消费的消息执行 ACK
+        //    即告诉 Broker：这些消息已被成功处理，可以删除或标记为已消费。
         //ack if consume success
         for (int i = 0; i <= ackIndex; i++) {
             this.defaultMQPushConsumerImpl.ackAsync(consumeRequest.getMsgs().get(i), consumerGroup);
@@ -249,6 +272,7 @@ public class ConsumeMessagePopConcurrentlyService implements ConsumeMessageServi
         }
 
         //consume later if consume fail
+        // 对失败或未成功消费的消息进行“重新投递”或“延迟重试”
         for (int i = ackIndex + 1; i < consumeRequest.getMsgs().size(); i++) {
             MessageExt msgExt = consumeRequest.getMsgs().get(i);
             consumeRequest.getPopProcessQueue().ack();
@@ -285,6 +309,7 @@ public class ConsumeMessagePopConcurrentlyService implements ConsumeMessageServi
     }
 
     private void changePopInvisibleTime(final MessageExt msg, String consumerGroup, int delayLevel) {
+        // 如果不指定延迟等级，那就从消费次数获取
         if (0 == delayLevel) {
             delayLevel = msg.getReconsumeTimes();
         }
