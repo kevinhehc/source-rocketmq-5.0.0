@@ -97,6 +97,15 @@ public class ProxyConfig implements ConfigFile {
     private int channelExpiredInSeconds = 60;
     private int contextExpiredInSeconds = 30;
 
+    //rocketmqMQClientNum 用来控制 Proxy 内部创建多少个 RocketMQ 客户端实例，从而实现对 Broker 的并发访问与负载分摊，是提升吞吐与稳定性的重要性能参数。
+    //rocketmqMQClientNum 表示 Proxy 内部维护的 RocketMQ 客户端数量（MQClient 实例数）。
+    //在 RocketMQ 5.x 的 Proxy 架构中，Proxy 并不是直接把消息转发到 Broker，而是通过内部的 MQClient 与 Broker 进行通信。
+    //每个 MQClient 会：
+    //	•	维护与多个 Broker 的连接；
+    //	•	管理路由缓存；
+    //	•	处理发送、拉取、ACK、续期等请求；
+    //	•	管理内部线程池与网络通道。
+    //因此，这个参数控制 Proxy 进程中创建多少个这样的 RocketMQ 网络客户端实例。
     private int rocketmqMQClientNum = 6;
 
     private long grpcProxyRelayRequestTimeoutInSeconds = 5;
